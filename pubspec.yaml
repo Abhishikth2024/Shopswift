@@ -1,0 +1,31 @@
+name: shop_swift
+description: "A new Flutter project."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_auth: ^5.5.4
+  firebase_core: ^3.13.1
+  google_sign_in: ^6.2.1
+  cupertino_icons: ^1.0.8
+  cloud_firestore: 5.6.8
+  firebase_database: ^11.0.1
+  carousel_slider: ^5.0.0
+  fluttertoast: ^8.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/images/
