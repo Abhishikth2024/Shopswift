@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
 import 'chat_screen.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'login_screen.dart';
+import 'write_screen_review.dart';
+import 'other_user_profile_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -136,19 +137,184 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             if (sellerName.isNotEmpty) ...[
               const SizedBox(height: 10),
-              Text(
-                sellerName,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+              GestureDetector(
+                onTap: () {
+                  if (sellerId.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            OtherUserProfileScreen(userId: sellerId),
+                      ),
+                    );
+                  }
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundImage: NetworkImage(
+                        widget.product['sellerImage'] ??
+                            'https://ui-avatars.com/api/?name=$sellerName',
+                      ),
+                      backgroundColor: Colors.grey[300],
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sellerName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                        if (sellerEmail.isNotEmpty)
+                          Text(
+                            sellerEmail,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black54,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              if (sellerEmail.isNotEmpty)
-                Text(
-                  sellerEmail,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54),
-                ),
+
+              const SizedBox(height: 8),
+              FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(sellerId)
+                    .get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  }
+
+                  final data = snapshot.data?.data() as Map<String, dynamic>?;
+
+                  if (data == null) return const SizedBox.shrink();
+
+                  final rating = (data['averageRating'] ?? 0).toStringAsFixed(
+                    1,
+                  );
+                  final count = data['reviewCount'] ?? 0;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$rating ⭐ ($count reviews)',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 6),
+                      if (!isOwnProduct)
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.rate_review_outlined),
+                          label: const Text('Write a Review'),
+                          onPressed: () {
+                            if (isGuest) {
+                              _showLoginPrompt();
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      WriteReviewScreen(targetUserId: sellerId),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.report),
+                        label: const Text('Report User'),
+                        onPressed: () {
+                          if (isGuest) {
+                            _showLoginPrompt();
+                          } else {
+                            _showReportDialog(
+                              currentUser?.uid,
+                              sellerId,
+                              product['id'] ?? product['key'] ?? '',
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(sellerId)
+                    .collection('reviews')
+                    .orderBy('timestamp', descending: true)
+                    .limit(3)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final reviews = snapshot.data?.docs ?? [];
+
+                  if (reviews.isEmpty) {
+                    return const Text("No reviews yet.");
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Recent Reviews:",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      ...reviews.map((doc) {
+                        final r = doc.data() as Map<String, dynamic>;
+                        final name = r['reviewerName'] ?? 'User';
+                        final comment = r['comment'] ?? '';
+                        final rating = r['rating'] ?? 0;
+
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(child: Text(name[0])),
+                          title: Text('$name • $rating ⭐'),
+                          subtitle: Text(comment),
+                        );
+                      }),
+                    ],
+                  );
+                },
+              ),
             ],
+
             const SizedBox(height: 20),
             const Text(
               "Description:",
@@ -336,6 +502,62 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showReportDialog(
+    String? reporterId,
+    String reportedUserId,
+    String productId,
+  ) {
+    final TextEditingController _reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Report User"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Please describe the reason for reporting:"),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reasonController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: "Enter your reason...",
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = _reasonController.text.trim();
+              if (reason.isEmpty || reporterId == null) return;
+
+              await FirebaseFirestore.instance.collection('reports').add({
+                'reporterId': reporterId,
+                'reportedUserId': reportedUserId,
+                'reason': reason,
+                'productId': productId,
+                'timestamp': FieldValue.serverTimestamp(),
+              });
+
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Report submitted successfully.")),
+              );
+            },
+            child: const Text("Submit"),
+          ),
+        ],
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'login_screen.dart';
@@ -60,7 +62,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           emailController.text.trim() != user!.email) {
         await user!.verifyBeforeUpdateEmail(emailController.text.trim());
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Verify your new email before it updates.")),
+          const SnackBar(
+            content: Text("Verify your new email before it updates."),
+          ),
         );
       }
 
@@ -249,10 +253,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return const MyListingScreen();
   }
 
+  Widget _buildReviewsTab() {
+    if (user == null) return const Center(child: Text("User not found"));
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .collection('reviews')
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final reviews = snapshot.data?.docs ?? [];
+
+        if (reviews.isEmpty) {
+          return const Center(child: Text("No reviews yet"));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: reviews.length,
+          itemBuilder: (context, index) {
+            final data = reviews[index].data() as Map<String, dynamic>;
+            final name = data['reviewerName'] ?? 'Anonymous';
+            final rating = data['rating']?.toString() ?? '0';
+            final comment = data['comment'] ?? '';
+            final date = data['timestamp'] != null
+                ? (data['timestamp'] as Timestamp).toDate()
+                : null;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(child: Text(name[0])),
+                title: Text("$name - $rating ⭐"),
+                subtitle: Text(
+                  "$comment\n${date != null ? date.toLocal().toString().split(' ')[0] : ''}",
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F5F5),
         appBar: AppBar(
@@ -265,11 +318,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             tabs: [
               Tab(icon: Icon(Icons.person), text: 'Profile'),
               Tab(icon: Icon(Icons.list), text: 'My Listings'),
+              Tab(icon: Icon(Icons.star), text: 'Reviews'),
             ],
           ),
         ),
         body: TabBarView(
-          children: [_buildProfileTab(context), _buildMyListingsTab()],
+          children: [
+            _buildProfileTab(context),
+            _buildMyListingsTab(),
+            _buildReviewsTab(),
+          ],
         ),
       ),
     );
