@@ -25,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final currentUser = FirebaseAuth.instance.currentUser;
   String productName = '';
+  DateTime? _lastNotifiedAt;
 
   @override
   void initState() {
@@ -35,7 +36,6 @@ class _ChatScreenState extends State<ChatScreen> {
   void _loadProductName() async {
     final dbRef = FirebaseDatabase.instance.ref('products/${widget.productId}');
     final snapshot = await dbRef.get();
-
     if (snapshot.exists) {
       final data = snapshot.value as Map<dynamic, dynamic>;
       if (mounted) {
@@ -81,20 +81,20 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index].data();
+                    final isSystem = msg['isSystem'] == true;
+                    final isMe = msg['senderId'] == currentUser!.uid;
 
-                    if (msg['isSystem'] == true &&
+                    if (isSystem &&
                         (msg['text']?.toString().toLowerCase().contains(
                               'offer accepted',
                             ) ??
                             false ||
                                 msg['text']!.toString().toLowerCase().contains(
                                   'offer rejected',
-                                ))) {
+                                ) ??
+                            false)) {
                       return const SizedBox.shrink();
                     }
-
-                    final isSystem = msg['isSystem'] == true;
-                    final isMe = msg['senderId'] == currentUser!.uid;
 
                     if (isSystem) {
                       return Padding(

@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class EditProductScreen extends StatefulWidget {
   final String productKey;
@@ -27,8 +31,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref(
     "products",
   );
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   late int _originalPrice;
+  String imageUrl = '';
+  File? selectedImage;
+  bool isUploading = false;
 
   @override
   void initState() {
@@ -46,6 +54,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
       text: widget.productData['year'] ?? '',
     );
 
+    imageUrl = widget.productData['image'] ?? '';
     _originalPrice =
         int.tryParse(
           widget.productData['price'].toString().replaceAll(
@@ -56,8 +65,36 @@ class _EditProductScreenState extends State<EditProductScreen> {
         0;
   }
 
+  Future<void> pickImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+    );
+    if (picked != null) {
+      setState(() {
+        selectedImage = File(picked.path);
+      });
+    }
+  }
+
+  Future<String> uploadImage(String productKey, File imageFile) async {
+    final ref = _storage.ref().child('product_images/$productKey.jpg');
+    await ref.putFile(imageFile);
+    return await ref.getDownloadURL();
+  }
+
   void _submit() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        isUploading = true;
+      });
+
+      String finalImageUrl = imageUrl;
+
+      if (selectedImage != null) {
+        finalImageUrl = await uploadImage(widget.productKey, selectedImage!);
+      }
+
       final int newPrice =
           int.tryParse(
             _priceController.text.trim().replaceAll(RegExp(r'[^0-9]'), ''),
@@ -71,7 +108,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         "brand": _brandController.text.trim(),
         "model": _modelController.text.trim(),
         "year": _yearController.text.trim(),
-        "image": widget.productData['image'],
+        "image": finalImageUrl,
         "uid": widget.productData['uid'],
         "tag": (newPrice < _originalPrice)
             ? "price_drop"
@@ -79,7 +116,10 @@ class _EditProductScreenState extends State<EditProductScreen> {
       };
 
       await _databaseRef.child(widget.productKey).update(updatedProduct);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        setState(() => isUploading = false);
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -94,6 +134,48 @@ class _EditProductScreenState extends State<EditProductScreen> {
           key: _formKey,
           child: ListView(
             children: [
+              if (isUploading) const LinearProgressIndicator(minHeight: 3),
+              const SizedBox(height: 10),
+              Center(
+                child: GestureDetector(
+                  onTap: pickImage,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: selectedImage != null
+                        ? Image.file(
+                            selectedImage!,
+                            height: 150,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            imageUrl,
+                            height: 150,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.image_not_supported),
+                            loadingBuilder: (context, child, progress) =>
+                                progress == null
+                                ? child
+                                : const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: pickImage,
+                icon: const Icon(Icons.image),
+                label: const Text("Change Image"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade200,
+                  foregroundColor: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: "Product Name"),
@@ -129,7 +211,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _submit,
+                onPressed: isUploading ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFF500),
                   foregroundColor: Colors.black,

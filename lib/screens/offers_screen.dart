@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shop_swift/services/notification_service.dart';
 import 'chat_screen.dart';
 
 class OffersScreen extends StatelessWidget {
   const OffersScreen({super.key});
 
   void _updateOfferStatus(String offerId, String status) async {
-    await FirebaseFirestore.instance.collection('offers').doc(offerId).update({
-      'status': status,
-    });
+    final docRef = FirebaseFirestore.instance.collection('offers').doc(offerId);
+    final snapshot = await docRef.get();
+    final data = snapshot.data() as Map<String, dynamic>?;
+
+    await docRef.update({'status': status});
+
+    if (data != null) {
+      await NotificationService.show(
+        'Offer ${status[0].toUpperCase()}${status.substring(1)}',
+        'You ${status == 'accepted' ? "accepted" : "rejected"} an offer for ${data['productTitle'] ?? "a product"}',
+      );
+    }
   }
 
   void _startChat(

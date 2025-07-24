@@ -78,11 +78,24 @@ class _MyListingScreenState extends State<MyListingScreen> {
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(12),
-                    leading: Image.asset(
-                      item['image'] ?? 'assets/images/default.jpg',
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        item['image'] ?? '',
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.image_not_supported),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const SizedBox(
+                            width: 50,
+                            height: 50,
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        },
+                      ),
                     ),
                     title: Text(item['name'] ?? ''),
                     subtitle: Text(item['desc'] ?? ''),

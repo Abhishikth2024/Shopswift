@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'login_screen.dart';
@@ -41,13 +42,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         lastNameController.text = data['lastName'] ?? '';
         phoneController.text = data['phone'] ?? '';
         emailController.text = user!.email ?? '';
+        final url = data['profilePicUrl'];
+        if (url != null) await user!.updatePhotoURL(url);
       }
     }
   }
 
   Future<void> _saveChanges() async {
     if (user == null) return;
-
     try {
       final updates = {
         'firstName': firstNameController.text.trim(),
@@ -55,9 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'phone': phoneController.text.trim(),
         'email': emailController.text.trim(),
       };
-
       await firebaseService.updateUserData(user!.uid, updates);
-
       if (!widget.isGoogleSignIn &&
           emailController.text.trim() != user!.email) {
         await user!.verifyBeforeUpdateEmail(emailController.text.trim());
@@ -67,7 +67,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully!')),
       );
@@ -75,6 +74,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to save changes: $e')));
+    }
+  }
+
+  Future<void> _uploadProfileImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile == null || user == null) return;
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_pictures')
+          .child('${user!.uid}.jpg');
+      await ref.putData(await pickedFile.readAsBytes());
+      final url = await ref.getDownloadURL();
+      await user!.updatePhotoURL(url);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .update({'profilePicUrl': url});
+      setState(() {});
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile picture updated')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to upload: $e')));
     }
   }
 
@@ -137,10 +163,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         email: user!.email!,
         password: currentPasswordController.text.trim(),
       );
-
       await user!.reauthenticateWithCredential(cred);
       await user!.updatePassword(newPasswordController.text.trim());
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password changed successfully.')),
       );
@@ -187,6 +211,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.all(16.0),
       child: ListView(
         children: [
+          Center(
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundImage: NetworkImage(
+                    user?.photoURL ??
+                        'https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png',
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.camera_alt, color: Colors.black),
+                  onPressed: _uploadProfileImage,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           _buildEditableField("First Name", firstNameController),
           const SizedBox(height: 16),
           _buildEditableField("Last Name", lastNameController),
@@ -255,7 +298,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildReviewsTab() {
     if (user == null) return const Center(child: Text("User not found"));
-
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -267,13 +309,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-
         final reviews = snapshot.data?.docs ?? [];
-
         if (reviews.isEmpty) {
           return const Center(child: Text("No reviews yet"));
         }
-
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: reviews.length,
@@ -285,7 +324,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final date = data['timestamp'] != null
                 ? (data['timestamp'] as Timestamp).toDate()
                 : null;
-
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(

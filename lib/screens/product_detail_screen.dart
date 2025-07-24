@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shop_swift/services/notification_service.dart';
 import '../services/chat_service.dart';
 import 'chat_screen.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -408,6 +409,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     'status': 'pending',
                     'createdAt': Timestamp.now(),
                   });
+
+                  await NotificationService.show(
+                    'New Offer Received',
+                    'You received an offer of \$$offerPrice for ${widget.product['name']}',
+                  );
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

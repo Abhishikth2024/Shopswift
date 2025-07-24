@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/notification_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -42,5 +43,7 @@ class ChatService {
       'text': message,
       'timestamp': FieldValue.serverTimestamp(),
     });
+
+    await NotificationService.show("New Message", message);
   }
 }

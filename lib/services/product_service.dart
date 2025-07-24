@@ -1,7 +1,9 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductService {
   final _dbRef = FirebaseDatabase.instance.ref("products");
+  final _firestore = FirebaseFirestore.instance;
 
   Stream<List<Map<String, dynamic>>> getProductStream() {
     return _dbRef.onValue.map((event) {
@@ -26,5 +28,61 @@ class ProductService {
         };
       }).toList();
     });
+  }
+
+  Future<void> addToFavorites(
+    String userId,
+    Map<String, dynamic> product,
+  ) async {
+    final docRef = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .doc(); // generates unique ID
+
+    final productWithTrackingId = {
+      ...product,
+      'originalProductId': product['id'],
+      'favoriteId': docRef.id,
+    };
+
+    await docRef.set(productWithTrackingId);
+  }
+
+  Future<void> removeFromFavorites(String userId, String productId) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .where('originalProductId', isEqualTo: productId)
+        .get();
+
+    for (var doc in snapshot.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  Future<bool> isFavorite(String userId, String productId) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .where('originalProductId', isEqualTo: productId)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  Stream<List<Map<String, dynamic>>> getFavoritesStream(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => doc.data() as Map<String, dynamic>)
+              .toList(),
+        );
   }
 }
