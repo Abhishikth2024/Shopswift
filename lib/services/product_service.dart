@@ -25,6 +25,7 @@ class ProductService {
           "brand": value["brand"],
           "model": value["model"],
           "year": value["year"],
+          "isSold": value["isSold"] ?? false,
         };
       }).toList();
     });

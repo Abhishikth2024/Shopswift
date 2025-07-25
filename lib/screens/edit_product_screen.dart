@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:image_picker/image_picker.dart';
@@ -37,6 +36,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   String imageUrl = '';
   File? selectedImage;
   bool isUploading = false;
+  bool isSold = false;
 
   @override
   void initState() {
@@ -55,6 +55,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
     );
 
     imageUrl = widget.productData['image'] ?? '';
+    isSold = widget.productData['isSold'] ?? false;
+
     _originalPrice =
         int.tryParse(
           widget.productData['price'].toString().replaceAll(
@@ -85,9 +87,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        isUploading = true;
-      });
+      setState(() => isUploading = true);
 
       String finalImageUrl = imageUrl;
 
@@ -113,6 +113,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         "tag": (newPrice < _originalPrice)
             ? "price_drop"
             : (widget.productData['tag'] ?? ""),
+        "isSold": isSold,
       };
 
       await _databaseRef.child(widget.productKey).update(updatedProduct);
@@ -210,6 +211,18 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 validator: (v) => v!.isEmpty ? "Enter year" : null,
               ),
               const SizedBox(height: 20),
+              CheckboxListTile(
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                value: isSold,
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => isSold = val);
+                  }
+                },
+                title: const Text("Mark as Sold"),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: isUploading ? null : _submit,
                 style: ElevatedButton.styleFrom(

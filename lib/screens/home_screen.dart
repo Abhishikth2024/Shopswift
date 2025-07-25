@@ -1,3 +1,4 @@
+// KEEP IMPORTS UNCHANGED
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -114,11 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: productService.getProductStream(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting)
                     return const Center(child: CircularProgressIndicator());
-                  }
-
                   final products = snapshot.data ?? [];
+
                   final filtered = products.where((p) {
                     final nameMatch =
                         p['name']?.toString().toLowerCase().contains(
@@ -143,9 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     return nameMatch && brandMatch && modelMatch && yearMatch;
                   }).toList();
 
-                  if (filtered.isEmpty) {
+                  if (filtered.isEmpty)
                     return const Center(child: Text("No products found."));
-                  }
 
                   return GridView.builder(
                     itemCount: filtered.length,
@@ -158,6 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                     itemBuilder: (context, index) {
                       final p = filtered[index];
+                      final isSold = p['isSold'] == true;
+
                       return FutureBuilder<bool>(
                         future: productService.isFavorite(
                           currentUser!.uid,
@@ -166,197 +167,213 @@ class _HomeScreenState extends State<HomeScreen> {
                         builder: (context, snapshot) {
                           final isFav = snapshot.data ?? false;
 
-                          return Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black12,
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(12),
-                                      ),
-                                      child: CachedNetworkImage(
-                                        imageUrl: p['image'],
-                                        height: 140,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
-                                              Icons.image_not_supported,
-                                            ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Text(
-                                        p['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: Text(
-                                        p['desc'],
-                                        style: const TextStyle(fontSize: 14),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Text(
-                                        p['price'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      ProductDetailScreen(
-                                                        product: p,
-                                                      ),
-                                                ),
-                                              );
-                                            },
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: Colors.blue,
-                                            ),
-                                            child: const Text("View Details"),
-                                          ),
-                                          AnimatedScale(
-                                            scale: 1.2,
-                                            duration: const Duration(
-                                              milliseconds: 200,
-                                            ),
-                                            child: IconButton(
-                                              icon: Icon(
-                                                isFav
-                                                    ? Icons.favorite
-                                                    : Icons.favorite_border,
-                                                color: isFav
-                                                    ? Colors.red
-                                                    : null,
-                                              ),
-                                              onPressed: () async {
-                                                if (p['id'] == null) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Invalid product.',
-                                                      ),
-                                                    ),
-                                                  );
-                                                  return;
-                                                }
-
-                                                if (isFav) {
-                                                  await productService
-                                                      .removeFromFavorites(
-                                                        currentUser!.uid,
-                                                        p['id'],
-                                                      );
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        'Removed ${p['name']} from favorites.',
-                                                      ),
-                                                      duration: const Duration(
-                                                        seconds: 1,
-                                                      ),
-                                                    ),
-                                                  );
-                                                } else {
-                                                  await productService
-                                                      .addToFavorites(
-                                                        currentUser!.uid,
-                                                        p,
-                                                      );
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        'Added ${p['name']} to favorites!',
-                                                      ),
-                                                      duration: const Duration(
-                                                        seconds: 1,
-                                                      ),
-                                                    ),
-                                                  );
-                                                }
-                                                setState(() {});
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
+                          return Opacity(
+                            opacity: isSold ? 0.5 : 1.0,
+                            child: Stack(
+                              children: [
+                                Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.blue.shade100,
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black12,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
                                   ),
-                                  child: Text(
-                                    "${p['brand'] ?? 'N/A'} | ${p['year'] ?? 'N/A'}",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black87,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              top: Radius.circular(12),
+                                            ),
+                                        child: CachedNetworkImage(
+                                          imageUrl: p['image'],
+                                          height: 140,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) =>
+                                              const Center(
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              ),
+                                          errorWidget: (context, url, error) =>
+                                              const Icon(
+                                                Icons.image_not_supported,
+                                              ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Text(
+                                          p['name'],
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        child: Text(
+                                          p['desc'],
+                                          style: const TextStyle(fontSize: 14),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Text(
+                                          p['price'],
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            TextButton(
+                                              onPressed: isSold
+                                                  ? null
+                                                  : () {
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) =>
+                                                              ProductDetailScreen(
+                                                                product: p,
+                                                              ),
+                                                        ),
+                                                      );
+                                                    },
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.blue,
+                                              ),
+                                              child: const Text("View Details"),
+                                            ),
+                                            AnimatedScale(
+                                              scale: 1.2,
+                                              duration: const Duration(
+                                                milliseconds: 200,
+                                              ),
+                                              child: IconButton(
+                                                icon: Icon(
+                                                  isFav
+                                                      ? Icons.favorite
+                                                      : Icons.favorite_border,
+                                                  color: isFav
+                                                      ? Colors.red
+                                                      : null,
+                                                ),
+                                                onPressed: isSold
+                                                    ? null
+                                                    : () async {
+                                                        if (p['id'] == null) {
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                'Invalid product.',
+                                                              ),
+                                                            ),
+                                                          );
+                                                          return;
+                                                        }
+                                                        if (isFav) {
+                                                          await productService
+                                                              .removeFromFavorites(
+                                                                currentUser!
+                                                                    .uid,
+                                                                p['id'],
+                                                              );
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(
+                                                                'Removed ${p['name']} from favorites.',
+                                                              ),
+                                                              duration:
+                                                                  const Duration(
+                                                                    seconds: 1,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        } else {
+                                                          await productService
+                                                              .addToFavorites(
+                                                                currentUser!
+                                                                    .uid,
+                                                                p,
+                                                              );
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(
+                                                                'Added ${p['name']} to favorites!',
+                                                              ),
+                                                              duration:
+                                                                  const Duration(
+                                                                    seconds: 1,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        }
+                                                        setState(() {});
+                                                      },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSold
+                                          ? Colors.red.shade100
+                                          : Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      isSold
+                                          ? "SOLD"
+                                          : "${p['brand'] ?? 'N/A'} | ${p['year'] ?? 'N/A'}",
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           );
                         },
                       );
@@ -398,9 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 } else {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddProductScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const AddProductScreen()),
                   );
                 }
               },

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
+import 'admin/admin_panel_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -23,9 +27,34 @@ class _LoginScreenState extends State<LoginScreen> {
         passwordController.text,
       );
       if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        final data = userDoc.data();
+        final isBanned = (data?['banned'] ?? false) == true;
+
+        if (isBanned) {
+          await FirebaseAuth.instance.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Your account has been banned."),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => isLoading = false);
+          return;
+        }
+
+        final isAdmin = data?['isAdmin'] == true;
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (_) =>
+                isAdmin ? const AdminPanelScreen() : const HomeScreen(),
+          ),
         );
       }
     } catch (e) {
@@ -39,10 +68,33 @@ class _LoginScreenState extends State<LoginScreen> {
   void googleLogin() async {
     final user = await auth.signInWithGoogle();
     if (user != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final data = userDoc.data();
+      final isBanned = (data?['banned'] ?? false) == true;
+
+      if (isBanned) {
+        await FirebaseAuth.instance.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Your account has been banned."),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final isAdmin = data?['isAdmin'] == true;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const HomeScreen(isGoogleSignIn: true),
+          builder: (_) => isAdmin
+              ? const AdminPanelScreen()
+              : const HomeScreen(isGoogleSignIn: true),
         ),
       );
     }
